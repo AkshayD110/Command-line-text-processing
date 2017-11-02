@@ -62,6 +62,7 @@
     * [First or Last block](#first-or-last-block)
     * [Broken blocks](#broken-blocks)
 * [sed scripts](#sed-scripts)
+* [Gotchas and Tips](#gotchas-and-tips)
 * [Further Reading](#further-reading)
 
 <br>
@@ -109,6 +110,7 @@ The `/` character is idiomatically used as delimiter character. See also [Using 
 #### <a name="editing-stdin"></a>editing stdin
 
 ```bash
+$ # sample command output to be edited
 $ seq 10 | paste -sd,
 1,2,3,4,5,6,7,8,9,10
 
@@ -128,18 +130,19 @@ $ seq 10 | paste -sd, | sed 's/,/ : /g'
 #### <a name="editing-file-input"></a>editing file input
 
 * By default newline character is the line separator
-* See [Regular Expressions](#regular-expressions) section for qualifying search terms
-    * for example to distinguish between 'hi', 'this', 'his', 'history', etc
+* See [Regular Expressions](#regular-expressions) section for qualifying search terms, for ex
+    * word boundaries to distinguish between 'hi', 'this', 'his', 'history', etc
+    * multiple search terms, specific set of character, etc
 
 ```bash
 $ cat greeting.txt 
 Hi there
 Have a nice day
 
-$ # change first 'Hi' in each line to 'Hello'
-$ sed 's/Hi/Hello/' greeting.txt
-Hello there
-Have a nice day
+$ # change first 'e' in each line to 'E'
+$ sed 's/e/E/' greeting.txt
+Hi thEre
+HavE a nice day
 
 $ # change first 'nice day' in each line to 'safe journey'
 $ sed 's/nice day/safe journey/' greeting.txt
@@ -276,7 +279,7 @@ $ # bkp_dir/bkp.*.2017 for both and so on
 
 * By default, `sed` acts on entire file. Often, one needs to extract or change only specific lines based on text search, line numbers, lines between two patterns, etc
 * This filtering is much like using `grep`, `head` and `tail` commands in many ways and there are even more features
-    * Use `sed` for inplace editing, the filtered lines to be transformed etc. Not as substitute for `grep`, `head` and `tail`
+    * Use `sed` for inplace editing, the filtered lines to be transformed etc. Not as substitute for those commands
 
 <br>
 
@@ -376,6 +379,7 @@ And so are you.
 ```bash
 $ # same as: seq 23 45 | head -n5
 $ # remember that printing is default action if -n is not used
+$ # here, 5 is line number based addressing
 $ seq 23 45 | sed '5q'
 23
 24
@@ -419,7 +423,7 @@ $ seq 50 | tac | sed '/7/Q' | tac
 **Note**
 
 * This way of using quit commands won't work for inplace editing with multiple file input
-* See [this Q&A](https://unix.stackexchange.com/questions/309514/sed-apply-changes-in-multiple-files) for alternate solution as well using `gawk` and `perl` instead
+* See [this Q&A](https://unix.stackexchange.com/questions/309514/sed-apply-changes-in-multiple-files) for alternate solution, also has solutions using `gawk` and `perl`
 
 <br>
 
@@ -442,7 +446,7 @@ Sugar is sweet,
 #### <a name="combining-multiple-regexp"></a>Combining multiple REGEXP
 
 * See also [sed manual - Multiple commands syntax](https://www.gnu.org/software/sed/manual/sed.html#Multiple-commands-syntax) for more details
-* See also [sed scripts](#sed-scripts) section to use a file for multiple commands
+* See also [sed scripts](#sed-scripts) section for an alternate way
 
 ```bash
 $ # each command as argument to -e option
@@ -525,7 +529,6 @@ $ sed -n '2p' poem.txt
 Violets are blue,
 
 $ # print 2nd and 4th line
-$ # for `p`, `d`, `s` etc multiple commands can be specified separated by ;
 $ sed -n '2p; 4p' poem.txt 
 Violets are blue,
 And so are you.
@@ -534,10 +537,15 @@ $ # same as: tail -n1 poem.txt
 $ sed -n '$p' poem.txt 
 And so are you.
 
-$ # delete only 3rd line
-$ sed '3d' poem.txt 
+$ # delete except 3rd line
+$ sed '3!d' poem.txt
+Sugar is sweet,
+
+$ # substitution only on 2nd line
+$ sed '2 s/are/ARE/' poem.txt
 Roses are red,
-Violets are blue,
+Violets ARE blue,
+Sugar is sweet,
 And so are you.
 ```
 
@@ -1246,7 +1254,6 @@ Character ranges
     * Note that behavior of range will depend on locale settings
     * [arch wiki - locale](https://wiki.archlinux.org/index.php/locale)
     * [Linux: Define Locale and Language Settings](https://www.shellhacks.com/linux-define-locale-language-settings/)
-* [Matching Numeric Ranges with a Regular Expression](http://www.regular-expressions.info/numericranges.html)
 
 ```bash
 $ # filter lines made up entirely of digits, at least one
@@ -1264,16 +1271,23 @@ cat5
 foo
 123
 42
+```
 
+* Numeric ranges, easy for certain cases but not suitable always. Use `awk` or `perl` for arithmetic computation
+* See also [Matching Numeric Ranges with a Regular Expression](http://www.regular-expressions.info/numericranges.html)
+
+```bash
 $ # numbers between 10 to 29
 $ printf '23\n154\n12\n26\n98234\n' | sed -n '/^[12][0-9]$/p'
 23
 12
 26
+
 $ # numbers >= 100
 $ printf '23\n154\n12\n26\n98234\n' | sed -nE '/^[0-9]{3,}$/p'
 154
 98234
+
 $ # numbers >= 100 if there are leading zeros
 $ printf '0501\n035\n154\n12\n26\n98234\n' | sed -nE '/^0*[1-9][0-9]{2,}$/p'
 0501
@@ -1287,12 +1301,12 @@ Negating character class
 * For example, `^` as first character inside `[]` matches characters other than those specified inside character class
 
 ```bash
-$ # delete all characters before first =
-$ echo 'foo=bar; baz=123' | sed -E 's/^[^=]+//'
+$ # delete zero or more characters before first =
+$ echo 'foo=bar; baz=123' | sed 's/^[^=]*//'
 =bar; baz=123
 
-$ # delete all characters after last =
-$ echo 'foo=bar; baz=123' | sed -E 's/[^=]+$//'
+$ # delete zero or more characters after last =
+$ echo 'foo=bar; baz=123' | sed 's/[^=]*$//'
 foo=bar; baz=
 
 $ # same as: sed -n '/[aeiou]/!p'
@@ -1310,7 +1324,7 @@ Matching meta characters inside `[]`
 
 ```bash
 $ # to match - it should be first or last character within []
-$ printf 'Foo-bar\n123-456\n42\nCo-operate\n' | sed -nE '/^[a-z-]+$/Ip'
+$ printf 'Foo-bar\nabc-456\n42\nCo-operate\n' | sed -nE '/^[a-z-]+$/Ip'
 Foo-bar
 Co-operate
 
@@ -1364,7 +1378,7 @@ foo1
 bar
 
 $ # same as: sed -nE '/^[a-z-]+$/Ip'
-$ printf 'Foo-bar\n123-456\n42\nCo-operate\n' | sed -nE '/^[[:alpha:]-]+$/p'
+$ printf 'Foo-bar\nabc-456\n42\nCo-operate\n' | sed -nE '/^[[:alpha:]-]+$/p'
 Foo-bar
 Co-operate
 
@@ -1641,8 +1655,8 @@ $ echo 'foo:123:bar:baz' | sed -E 's/(.*):/\1-/'
 foo:123:bar-baz
 $ echo '456:foo:123:bar:789:baz' | sed -E 's/(.*):/\1-/'
 456:foo:123:bar:789-baz
-$ echo 'foo and bar and baz and good' | sed -E 's/(.*)and/\1XYZ/'
-foo and bar and baz XYZ good
+$ echo 'foo and bar and baz land good' | sed -E 's/(.*)and/\1XYZ/'
+foo and bar and baz lXYZ good
 $ # use word boundaries as necessary
 $ echo 'foo and bar and baz land good' | sed -E 's/(.*)\band\b/\1XYZ/'
 foo and bar XYZ baz land good
@@ -1868,6 +1882,7 @@ Sugar is sweet,
 * See also [Difference between single and double quotes in Bash](https://stackoverflow.com/questions/6697753/difference-between-single-and-double-quotes-in-bash)
 * For robust substitutions taking care of meta characters in *REGEXP* and *REPLACEMENT* sections, see
     * [How to ensure that string interpolated into sed substitution escapes all metachars](https://unix.stackexchange.com/questions/129059/how-to-ensure-that-string-interpolated-into-sed-substitution-escapes-all-metac)
+    * [What characters do I need to escape when using sed in a sh script?](https://unix.stackexchange.com/questions/32907/what-characters-do-i-need-to-escape-when-using-sed-in-a-sh-script)
     * [Is it possible to escape regex metacharacters reliably with sed](https://stackoverflow.com/questions/29613304/is-it-possible-to-escape-regex-metacharacters-reliably-with-sed)
 
 <br>
@@ -2409,6 +2424,7 @@ And so are you.
 ```
 
 * replacing a line or range of lines with contents of file
+* See also [various ways to replace line M in file1 with line N in file2](https://unix.stackexchange.com/a/396450)
 
 ```bash
 $ # replacing range of lines
@@ -2427,7 +2443,7 @@ Violets are blue,
 3
 And so are you.
 
-$ # can also use {} grouping
+$ # can also use {} grouping to avoid repeating the address
 $ seq 3 | sed -e '/blue/{r /dev/stdin' -e 'd}' poem.txt
 Roses are red,
 1
@@ -2468,6 +2484,7 @@ And so are you.
 
 ```bash
 $ # file has more lines than matching address
+$ # 2 lines in 5.txt but only 1 line matching 'is'
 $ sed '/is/R 5.txt' poem.txt 
 Roses are red,
 Violets are blue,
@@ -2476,10 +2493,12 @@ five
 And so are you.
 
 $ # lines matching address is more than file to be read
-$ seq 1 | sed '/are/R /dev/stdin' poem.txt 
+$ # 3 lines matching 'are' but only 2 lines from stdin
+$ seq 2 | sed '/are/R /dev/stdin' poem.txt
 Roses are red,
 1
 Violets are blue,
+2
 Sugar is sweet,
 And so are you.
 ```
@@ -2617,7 +2636,7 @@ $ # as long as match is found, command will be repeated on same input line
 $ echo 'foo bar|a b c|1 2 3|xyz abc' | sed -E ':a s/^(([^|]+\|){2}[^|]*) /\1_/; ta'
 foo bar|a b c|1_2_3|xyz abc
 
-$ # using perl or awk might be simpler
+$ # use awk/perl for simpler syntax
 $ # for ex: awk 'BEGIN{FS=OFS="|"} {gsub(/ /,"_",$3); print}'
 ```
 
@@ -2830,6 +2849,7 @@ c
 ```
 
 * To get a specific block, say 3rd one, `awk` or `perl` would be a better choice
+    * See [Specific blocks](./gnu_awk.md#specific-blocks) for `awk` examples
 
 <br>
 
@@ -2856,6 +2876,7 @@ baz
 * All lines till end of file gets printed with simple use of `sed -n '/BEGIN/,/END/p'`
 * The file reversing trick comes in handy here as well
 * But if both kinds of broken blocks are present, further processing will be required. Better to use `awk` or `perl` in such cases
+    * See [Broken blocks](./gnu_awk.md#broken-blocks) for `awk` examples
 
 ```bash
 $ sed -n '/BEGIN/,/END/p' broken_range.txt 
@@ -2973,15 +2994,189 @@ foo bar
 
 <br>
 
+## <a name="gotchas-and-tips"></a>Gotchas and Tips
+
+* dos style line endings
+
+```bash
+$ # no issue with unix style line ending
+$ printf 'foo bar\n123 789\n' | sed -E 's/\w+$/xyz/'
+foo xyz
+123 xyz
+
+$ # dos style line ending causes trouble
+$ printf 'foo bar\r\n123 789\r\n' | sed -E 's/\w+$/xyz/'
+foo bar
+123 789
+
+$ # can be corrected by adding \r as well to match
+$ # if needed, add \r in replacement section as well
+$ printf 'foo bar\r\n123 789\r\n' | sed -E 's/\w+\r$/xyz/'
+foo xyz
+123 xyz
+```
+
+* changing dos to unix style line ending and vice versa
+
+```bash
+$ # bash functions
+$ unix2dos() { sed -i 's/$/\r/' "$@" ; }
+$ dos2unix() { sed -i 's/\r$//' "$@" ; }
+
+$ cat -A 5.txt
+five$
+1five$
+
+$ unix2dos 5.txt
+$ cat -A 5.txt
+five^M$
+1five^M$
+
+$ dos2unix 5.txt
+$ cat -A 5.txt
+five$
+1five$
+```
+
+* variable/command substitution
+
+```bash
+$ # variables don't get expanded within single quotes
+$ printf 'user\nhome\n' | sed '/user/ s/$/: $USER/'
+user: $USER
+home
+$ printf 'user\nhome\n' | sed '/user/ s/$/: '"$USER"'/'
+user: learnbyexample
+home
+
+$ # variable being substituted cannot have the delimiter character
+$ printf 'user\nhome\n' | sed '/home/ s/$/: '"$HOME"'/'
+sed: -e expression #1, char 15: unknown option to `s'
+$ printf 'user\nhome\n' | sed '/home/ s#$#: '"$HOME"'#'
+user
+home: /home/learnbyexample
+
+$ # use r command for robust insertion from file/command-output
+$ sed '1a'"$(seq 2)" 5.txt
+sed: -e expression #1, char 5: missing command
+$ seq 2 | sed '1r /dev/stdin' 5.txt
+five
+1
+2
+1five
+```
+
+* common regular expression mistakes #1 - greediness
+
+```bash
+$ s='foo and bar and baz land good'
+$ echo "$s" | sed 's/foo.*ba/123 789/'
+123 789z land good
+
+$ # use a more restrictive version
+$ echo "$s" | sed -E 's/foo \w+ ba/123 789/'
+123 789r and baz land good
+
+$ # or use a tool with non-greedy feature available
+$ echo "$s" | perl -pe 's/foo.*?ba/123 789/'
+123 789r and baz land good
+
+$ # for single characters, use negated character class
+$ echo 'foo=123,baz=789,xyz=42' | sed 's/foo=.*,//'
+xyz=42
+$ echo 'foo=123,baz=789,xyz=42' | sed 's/foo=[^,]*,//'
+baz=789,xyz=42
+```
+
+* common regular expression mistakes #2 - BRE vs ERE syntax
+
+```bash
+$ # + needs to be escaped with BRE or enable ERE
+$ echo 'like 42 and 37' | sed 's/[0-9]+/xxx/g'
+like 42 and 37
+$ echo 'like 42 and 37' | sed -E 's/[0-9]+/xxx/g'
+like xxx and xxx
+
+$ # or escaping when not required
+$ echo 'get {} and let' | sed 's/\{\}/[]/'
+sed: -e expression #1, char 10: Invalid preceding regular expression
+$ echo 'get {} and let' | sed 's/{}/[]/'
+get [] and let
+```
+
+* common regular expression mistakes #3 - using PCRE syntax/features
+    * especially by trying out solution on online sites like [regex101](https://regex101.com/) and expecting it to work with `sed` as well
+
+```bash
+$ # \d is not available as backslash character class, will match 'd' instead
+$ echo 'like 42 and 37' | sed -E 's/\d+/xxx/g'
+like 42 anxxx 37
+$ echo 'like 42 and 37' | sed -E 's/[0-9]+/xxx/g'
+like xxx and xxx
+
+$ # features like lookarounds/non-greedy/etc not available
+$ echo 'foo,baz,,xyz,,,123' | sed -E 's/,\K(?=,)/NaN/g'
+sed: -e expression #1, char 16: Invalid preceding regular expression
+$ echo 'foo,baz,,xyz,,,123' | perl -pe 's/,\K(?=,)/NaN/g'
+foo,baz,NaN,xyz,NaN,NaN,123
+```
+
+* common regular expression mistakes #4 - end of line white-space
+
+```bash
+$ printf 'foo bar \n123 789\t\n' | sed -E 's/\w+$/xyz/'
+foo bar 
+123 789 
+
+$ printf 'foo bar \n123 789\t\n' | sed -E 's/\w+\s*$/xyz/'
+foo xyz
+123 xyz
+```
+
+* and many more... see also
+    * [Why does my regular expression work in X but not in Y?](https://unix.stackexchange.com/questions/119905/why-does-my-regular-expression-work-in-x-but-not-in-y)
+    * [Greedy vs. Reluctant vs. Possessive Quantifiers](https://stackoverflow.com/questions/5319840/greedy-vs-reluctant-vs-possessive-quantifiers)
+    * [How to replace everything between but only until the first occurrence of the end string?](https://stackoverflow.com/questions/45168607/how-to-replace-everything-between-but-only-until-the-first-occurrence-of-the-end)
+    * [How to match a specified pattern with multiple possibilities](https://stackoverflow.com/questions/43650926/how-to-match-a-specified-pattern-with-multiple-possibilities)
+    * [mixing different regex syntax](https://stackoverflow.com/questions/45389684/cant-comment-a-line-in-my-cnf/45389833#45389833)
+    * [sed manual - BRE-vs-ERE](https://www.gnu.org/software/sed/manual/sed.html#BRE-vs-ERE)
+
+* Speed boost for ASCII encoded input
+
+```bash
+$ time sed -nE '/^([a-d][r-z]){3}$/p' /usr/share/dict/words
+avatar
+awards
+cravat
+
+real    0m0.058s
+$ time LC_ALL=C sed -nE '/^([a-d][r-z]){3}$/p' /usr/share/dict/words
+avatar
+awards
+cravat
+
+real    0m0.038s
+
+$ time sed -nE '/^([a-z]..)\1$/p' /usr/share/dict/words > /dev/null
+
+real    0m0.111s
+$ time LC_ALL=C sed -nE '/^([a-z]..)\1$/p' /usr/share/dict/words > /dev/null
+
+real    0m0.073s
+```
+
+<br>
+
 ## <a name="further-reading"></a>Further Reading
 
 * Manual and related
     * `man sed` and `info sed` for more details, known issues/limitations as well as options/commands not covered in this tutorial
     * [GNU sed manual](https://www.gnu.org/software/sed/manual/sed.html) has even more detailed information and examples
     * [sed FAQ](http://sed.sourceforge.net/sedfaq.html), but last modified '10 March 2003'
-    * [BSD/macOS Sed vs GNU Sed vs the POSIX Sed specification](https://stackoverflow.com/documentation/sed/9436/bsd-macos-sed-vs-gnu-sed-vs-the-posix-sed-specification#t=201706201518543829325)
+    * [BSD/macOS Sed vs GNU Sed vs the POSIX Sed specification](https://stackoverflow.com/questions/24275070/sed-not-giving-me-correct-substitute-operation-for-newline-with-mac-difference/24276470#24276470)
+    * [Differences between sed on Mac OSX and other standard sed](https://unix.stackexchange.com/questions/13711/differences-between-sed-on-mac-osx-and-other-standard-sed)
 * Tutorials and Q&A
-    * [sed basics](http://code.snipcademy.com/tutorials/shell-scripting/sed/introduction)
+    * [sed basics](https://code.snipcademy.com/tutorials/shell-scripting/sed/introduction)
     * [sed detailed tutorial](http://www.grymoire.com/Unix/Sed.html) - has details on differences between various `sed` versions as well
     * [sed one-liners explained](http://www.catonmat.net/series/sed-one-liners-explained)
     * [cheat sheet](http://www.catonmat.net/download/sed.stream.editor.cheat.sheet.txt)
@@ -2995,11 +3190,11 @@ foo bar
     * [How to select lines between two patterns?](https://stackoverflow.com/questions/38972736/how-to-select-lines-between-two-patterns)
     * [get lines between two patterns only if there is third pattern between them](https://stackoverflow.com/questions/39960075/bash-how-to-get-lines-between-patterns-only-if-there-is-pattern2-between-them)
         * [similar example](https://unix.stackexchange.com/questions/228699/sed-print-lines-matched-by-a-pattern-range-if-one-line-matches-a-condition)
-* Learn Regular Expressions
+* Learn Regular Expressions (has information on flavors other than BRE/ERE too)
     * [Regular Expressions Tutorial](http://www.regular-expressions.info/tutorial.html)
     * [regexcrossword](https://regexcrossword.com/)
     * [What does this regex mean?](https://stackoverflow.com/questions/22937618/reference-what-does-this-regex-mean)
 * Related tools
     * [sedsed - Debugger, indenter and HTMLizer for sed scripts](https://github.com/aureliojargas/sedsed)
     * [xo - composes regular expression match groups](https://github.com/ezekg/xo)
-
+* [unix.stackexchange - When to use grep, sed, awk, perl, etc](https://unix.stackexchange.com/questions/303044/when-to-use-grep-less-awk-sed)

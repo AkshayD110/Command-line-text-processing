@@ -1,380 +1,542 @@
-## <a name="perl"></a>perl
+# <a name="perl-one-liners"></a>Perl one liners
 
->The Perl 5 language interpreter
+**Table of Contents**
 
-[Larry Wall](https://en.wikipedia.org/wiki/Larry_Wall) wrote Perl as a **general purpose scripting language**, borrowing features from **C, shell scripting, awk, sed, grep, cut, sort** etc
-
-Reference tables given below for frequently used constructs with **perl one-liners**. Resource links given at end for further reading.
-
-<br>
-
-Descriptions adapted from [perldoc - command switches](http://perldoc.perl.org/perlrun.html#Command-Switches)
-
-| Option | Description |
-| ------------- | ----------- |
-| -e | execute perl code |
-| -n | iterate over input files in a loop, lines are NOT printed by default |
-| -p | iterate over input files in a loop, lines are printed by default |
-| -l | chomp input line, $\ gets value of $/ if no argument given |
-| -a | autosplit input lines on space, implicitly sets -n for Perl version 5.20.0 and above |
-| -F | specifies the pattern to split input lines, implicitly sets -a and -n for Perl version 5.20.0 and above |
-| -i | edit files inplace, if extension provided make a backup copy |
-| -0777 | slurp entire file as single string, not advisable for large input files |
+* [Executing Perl code](#executing-perl-code)
+* [Simple search and replace](#simple-search-and-replace)
+* [Line filtering](#line-filtering)
+    * [Regular expressions based filtering](#regular-expressions-based-filtering)
+    * [Fixed string matching](#fixed-string-matching)
+    * [Line number based filtering](#line-number-based-filtering)
+* [Field processing](#field-processing)
+    * [Specifying different input field separator](#specifying-different-input-field-separator)
+    * [Specifying different output field separator](#specifying-different-output-field-separator)
 
 <br>
-
-Descriptions adapted from [perldoc - Special Variables](http://perldoc.perl.org/perlvar.html#SPECIAL-VARIABLES)
-
-| Variable | Description |
-| ------------- | ----------- |
-| $_ | The default input and pattern-searching space |
-| $. | Current line number |
-| $/ | input record separator, newline by default |
-| $\ | output record separator, empty string by default |
-| @F | contains the fields of each line read, applicable with -a or -F option |
-| %ENV | contains current environment variables |
-| $ARGV | contains the name of the current file |
-
-<br>
-
-| Function | Description |
-| ------------- | ----------- |
-| length | Returns the length in characters of the value of EXPR. If EXPR is omitted, returns the length of $_ |
-| eof | Returns 1 if the next read on FILEHANDLE will return end of file |
-
-<br>
-
-**Simple Perl program**
 
 ```bash
-$ perl -e 'print "Hello!\nTesting Perl one-liner\n"'
-Hello!
-Testing Perl one-liner
+$ perl -le 'print $^V'
+v5.22.1
+
+$ man perl
+PERL(1)                Perl Programmers Reference Guide                PERL(1)
+
+NAME
+       perl - The Perl 5 language interpreter
+
+SYNOPSIS
+       perl [ -sTtuUWX ]      [ -hv ] [ -V[:configvar] ]
+            [ -cw ] [ -d[t][:debugger] ] [ -D[number/list] ]
+            [ -pna ] [ -Fpattern ] [ -l[octal] ] [ -0[octal/hexadecimal] ]
+            [ -Idir ] [ -m[-]module ] [ -M[-]'module...' ] [ -f ]
+            [ -C [number/list] ]      [ -S ]      [ -x[dir] ]
+            [ -i[extension] ]
+            [ [-e|-E] 'command' ] [ -- ] [ programfile ] [ argument ]...
+
+       For more information on these options, you can run "perldoc perlrun".
+...
 ```
+
+**Prerequisites and notes**
+
+* familiarity with programming concepts like variables, printing, control structures, arrays, etc
+* Perl borrows syntax/features from **C, shell scripting, awk, sed** etc. Prior experience working with them would help a lot
+* familiarity with regular expression basics
+    * if not, check out **ERE** portion of [GNU sed regular expressions](./gnu_sed.md#regular-expressions)
+    * examples for non-greedy, lookarounds, etc will be covered here
+* this tutorial is primarily focussed on short programs that are easily usable from command line, similar to using `grep`, `sed`, `awk` etc
+    * do NOT use style/syntax presented here when writing full fledged Perl programs which should use **strict, warnings** etc
+* links to Perl documentation will be added as necessary
+* unless otherwise specified, consider input as ASCII encoded text only
 
 <br>
 
-**Example input file**
+## <a name="executing-perl-code"></a>Executing Perl code
+
+* One way is to put code in a file and use `perl` command with filename as argument
+* Another is to use [shebang](https://en.wikipedia.org/wiki/Shebang_(Unix)) at beginning of script, make the file executable and directly run it
 
 ```bash
-$ cat test.txt 
-abc  : 123 : xyz
-3    : 32  : foo
--2.3 : bar : bar
+$ cat code.pl
+print "Hello Perl\n"
+$ perl code.pl
+Hello Perl
+
+$ # similar to bash
+$ cat code.sh
+echo 'Hello Bash'
+$ bash code.sh
+Hello Bash
 ```
 
-<br>
-
-* Search and replace
+* For short programs, one can use `-e` commandline option to provide code from command line itself
+* This entire chapter is about using `perl` this way from commandline
 
 ```bash
-$ perl -pe 's/3/%/' test.txt
-abc  : 12% : xyz
-%    : 32  : foo
--2.% : bar : bar
+$ perl -e 'print "Hello Perl\n"'
+Hello Perl
 
-$ # use g flag to replace all occurrences, not just first match in line
-$ perl -pe 's/3/%/g' test.txt
-abc  : 12% : xyz
-%    : %2  : foo
--2.% : bar : bar
+$ # similar to
+$ bash -c 'echo "Hello Bash"'
+Hello Bash
 
-$ # conditional replacement
-$ perl -pe 's/3/@/g if /foo/' test.txt 
-abc  : 123 : xyz
-@    : @2  : foo
--2.3 : bar : bar
-
-$ # using shell variables
-$ r="@"
-$ perl -pe "s/3/$r/" test.txt 
-abc  : 12@ : xyz
-@    : 32  : foo
--2.@ : bar : bar
-
-$ # preferred approach is to use ENV hash variable
-$ export s="%"
-$ perl -pe 's/3/$ENV{s}/' test.txt 
-abc  : 12% : xyz
-%    : 32  : foo
--2.% : bar : bar
+$ # multiple commands can be issued separated by ;
+$ # -l will be covered later, here used to append newline to print
+$ perl -le '$a=25; $b=12; print $a**$b'
+59604644775390625
 ```
-
-<br>
-
-* Search and replace special characters
-
-The `\Q` and `q()` constructs are helpful to nullify regex meta characters
-
-```bash
-$ # if not properly escaped or quoted, it can lead to errors
-$ echo '*.^[}' | perl -pe 's/*.^[}/abc/'
-Quantifier follows nothing in regex; marked by <-- HERE in m/* <-- HERE .^[}/ at -e line 1.
-
-$ echo '*.^[}' | perl -pe 's/\*\.\^\[}/abc/'
-abc
-
-$ echo '*.^[}' | perl -pe 's/\Q*.^[}/abc/'
-abc
-
-$ echo '*.^[}' | perl -pe 's/\Q*.^[}/\$abc\$/'
-$abc$
-
-$ echo '*.^[}' | perl -pe 's/\Q*.^[}/q($abc$)/e'
-$abc$
-```
-
-<br>
-
-* Print lines based on line number or pattern
-
-```bash
-$ perl -ne 'print if /a/' test.txt 
-abc  : 123 : xyz
--2.3 : bar : bar
-
-$ perl -ne 'print if !/abc/' test.txt 
-3    : 32  : foo
--2.3 : bar : bar
-
-$ seq 123 135 | perl -ne 'print if $. == 7'
-129
-
-$ seq 1 30 | perl -ne 'print if eof'
-30
-
-$ # Use exit to save time on large input files
-$ seq 14323 14563435 | perl -ne 'if($. == 234){print; exit}'
-14556
-
-$ # length() can also be used instead of length $_
-$ seq 8 13 | perl -lne 'print if length $_ == 1'
-8
-9
-```
-
-<br>
-
-* Print range of lines based on line number or pattern
-
-```bash
-$ seq 123 135 | perl -ne 'print if $. >= 3 && $. <= 5'
-125
-126
-127
-
-$ # $. is default variable compared against when using ..
-$ seq 123 135 | perl -ne 'print if 3..5'
-125
-126
-127
-
-$ # can use many alternatives, eof looks more readable
-$ seq 5 | perl -ne 'print if 3..eof'
-3
-4
-5
-
-$ # matching regex specified by /pattern/ is checked against $_
-$ seq 5 | perl -ne 'print if 3../4/'
-3
-4
-
-$ seq 1 30 | perl -ne 'print if /4/../6/'
-4
-5
-6
-14
-15
-16
-24
-25
-26
-
-$ seq 2 8 | perl -ne 'print if !(/4/../6/)'
-2
-3
-7
-8
-```
-
-<br>
-
-* `..` vs `...`
-
-```bash
-$ echo -e '10\n11\n10' | perl -ne 'print if /10/../10/'
-10
-10
-
-$ echo -e '10\n11\n10' | perl -ne 'print if /10/.../10/'
-10
-11
-10
-```
-
-<br>
-
-* Column manipulations
-
-```bash
-$ echo -e "1 3 4\na b c" | perl -nale 'print $F[1]'
-3
-b
-
-$ echo -e "1,3,4,8\na,b,c,d" | perl -F, -lane 'print $F[$#F]'
-8
-d
-
-$ perl -F: -lane 'print "$F[0] $F[2]"' test.txt 
-abc    xyz
-3      foo
--2.3   bar
-
-$ perl -F: -lane '$sum+=$F[1]; END{print $sum}' test.txt 
-155
-
-$ perl -F: -lane '$F[2] =~ s/\w(?=\w)/$&,/g; print join ":", @F' test.txt 
-abc  : 123 : x,y,z
-3    : 32  : f,o,o
--2.3 : bar : b,a,r
-
-$ perl -F'/:\s*[a-z]+/i' -lane 'print $F[0]' test.txt 
-abc  : 123 
-3    : 32  
--2.3 
-
-$ perl -F'\s*:\s*' -lane 'print join ",", grep {/[a-z]/i} @F' test.txt 
-abc,xyz
-foo
-bar,bar
-
-$ perl -F: -ane 'print if (grep {/\d/} @F) < 2' test.txt 
-abc  : 123 : xyz
--2.3 : bar : bar
-```
-
-<br>
-
-* Dealing with duplicates
-
-```bash
-$ cat duplicates.txt 
-abc 123 ijk
-foo 567 xyz
-abc 123 ijk
-bar 090 pqr
-tst 567 zzz
-
-$ # whole line
-$ perl -ne 'print if !$seen{$_}++' duplicates.txt 
-abc 123 ijk
-foo 567 xyz
-bar 090 pqr
-tst 567 zzz
-
-$ # particular column
-$ perl -ane 'print if !$seen{$F[1]}++' duplicates.txt 
-abc 123 ijk
-foo 567 xyz
-bar 090 pqr
-```
-
-<br>
-
-* Multiline processing
-
-```bash
-$ # save previous lines to make it easier for multiline matching
-$ perl -ne 'print if /3/ && $p =~ /abc/; $p = $_' test.txt 
-3    : 32  : foo
-
-$ perl -ne 'print "$p$_" if /3/ && $p =~ /abc/; $p = $_' test.txt 
-abc  : 123 : xyz
-3    : 32  : foo
-
-$ # with multiline matching, -0777 slurping not advisable for very large files
-$ perl -0777 -ne 'print $1 if /.*abc.*\n(.*3.*\n)/' test.txt 
-3    : 32  : foo
-$ perl -0777 -ne 'print $1 if /(.*abc.*\n.*3.*\n)/' test.txt 
-abc  : 123 : xyz
-3    : 32  : foo
-
-$ # use s flag to allow .* to match across lines
-$ perl -0777 -pe 's/(.*abc.*32)/ABC/s' test.txt 
-ABC  : foo
--2.3 : bar : bar
-
-$ # use m flag if ^$ anchors are needed to match individual lines
-$ perl -0777 -pe 's/(.*abc.*3)/ABC/s' test.txt 
-ABC : bar : bar
-$ perl -0777 -pe 's/(.*abc.*^3)/ABC/sm' test.txt 
-ABC    : 32  : foo
--2.3 : bar : bar
-
-$ # print multiple lines after matching line
-$ perl -ne 'if(/abc/){ print; foreach (1..2){$n = <>; print $n} }' test.txt 
-abc  : 123 : xyz
-3    : 32  : foo
--2.3 : bar : bar
-```
-
-<br>
-
-* Using modules
-
-```bash
-$ echo 'a,b,a,c,d,1,d,c,2,3,1,b' | perl -MList::MoreUtils=uniq -F, -lane 'print join ",",uniq(@F)'
-a,b,c,d,1,2,3
-
-$ base64 test.txt 
-YWJjICA6IDEyMyA6IHh5egozICAgIDogMzIgIDogZm9vCi0yLjMgOiBiYXIgOiBiYXIK
-$ base64 test.txt | base64 -d
-abc  : 123 : xyz
-3    : 32  : foo
--2.3 : bar : bar
-$ base64 test.txt | perl -MMIME::Base64 -ne 'print decode_base64($_)' 
-abc  : 123 : xyz
-3    : 32  : foo
--2.3 : bar : bar
-
-$ perl -MList::MoreUtils=indexes -nale '@i = indexes { /[a-z]/i } @F if $. == 1; print join ",", @F[@i]' test.txt 
-abc,xyz
-3,foo
--2.3,bar
-```
-
-<br>
-
-* In place editing
-
-```bash
-$ perl -i -pe 's/\d/*/g' test.txt 
-$ cat test.txt 
-abc  : *** : xyz
-*    : **  : foo
--*.* : bar : bar
-
-$ perl -i.bak -pe 's/\*/^/g' test.txt 
-$ cat test.txt 
-abc  : ^^^ : xyz
-^    : ^^  : foo
--^.^ : bar : bar
-$ cat test.txt.bak 
-abc  : *** : xyz
-*    : **  : foo
--*.* : bar : bar
-```
-
-<br>
 
 **Further Reading**
 
-* [Perl Introduction](https://github.com/learnbyexample/Perl_intro) - Introductory course for Perl 5 through examples
-* [Perl curated resources](https://github.com/learnbyexample/scripting_course/blob/master/Perl_curated_resources.md)
-* [Handy Perl regular expressions](http://www.catonmat.net/blog/perl-one-liners-explained-part-seven/)
-* [What does this regex mean?](http://stackoverflow.com/questions/22937618/reference-what-does-this-regex-mean)
-* [Perl one-liners](http://www.catonmat.net/series/perl-one-liners-explained) 
-* [Perl command line switches](http://perl101.org/command-line-switches.html)
-* [Env](http://perldoc.perl.org/Env.html)
+* `perl -h` for summary of options
+* [perldoc - Command Switches](https://perldoc.perl.org/perlrun.html#Command-Switches)
+* [explainshell](https://explainshell.com/explain?cmd=perl+-F+-l+-anpeE+-i+-0+-M) - to quickly get information without having to traverse through the docs
 
+
+<br>
+
+## <a name="simple-search-and-replace"></a>Simple search and replace
+
+* **substitution** command syntax is very similar to `sed` for search and replace
+    * syntax is `variable =~ s/REGEXP/REPLACEMENT/FLAGS` and by default acts on `$_` if variable is not specified
+    * see [perldoc - SPECIAL VARIABLES](https://perldoc.perl.org/perlvar.html#SPECIAL-VARIABLES) for explanation on `$_` and other such special variables
+    * more detailed examples will be covered in later sections
+* Just like other text processing commands, `perl` will automatically loop over input line by line when `-n` or `-p` option is used
+    * like `sed`, the `-n` option won't print the record
+    * `-p` will print the record, including any changes made
+    * newline character being default record separator
+    * `$_` will contain the input record content, including the record separator
+* and similar to other commands, `perl` will work with both stdin and file input
+
+```bash
+$ # change only first ',' to ' : '
+$ # same as: sed 's/,/ : /'
+$ seq 10 | paste -sd, | perl -pe 's/,/ : /'
+1 : 2,3,4,5,6,7,8,9,10
+
+$ # change all ',' to ' : ' by using 'g' modifier
+$ # same as: sed 's/,/ : /g'
+$ seq 10 | paste -sd, | perl -pe 's/,/ : /g'
+1 : 2 : 3 : 4 : 5 : 6 : 7 : 8 : 9 : 10
+
+$ cat greeting.txt
+Hi there
+Have a nice day
+$ # same as: sed 's/nice day/safe journey/' greeting.txt
+$ perl -pe 's/nice day/safe journey/' greeting.txt
+Hi there
+Have a safe journey
+```
+
+* inplace editing
+* similar to [GNU sed - using * with inplace option](./gnu_sed.md#prefix-backup-name), one can also use `*` to either prefix the backup name or place the backup files in another existing directory
+
+```bash
+$ # same as: sed -i.bkp 's/Hi/Hello/' greeting.txt
+$ perl -i.bkp -pe 's/Hi/Hello/' greeting.txt
+$ # original file gets preserved in 'greeting.txt.bkp'
+$ cat greeting.txt
+Hello there
+Have a nice day
+
+$ # use this with caution, changes made cannot be undone
+$ perl -i -pe 's/nice day/safe journey/' greeting.txt
+$ cat greeting.txt
+Hello there
+Have a safe journey
+```
+
+* Multiple input files are treated individually and changes are written back to respective files
+
+```bash
+$ cat f1
+I ate 3 apples
+$ cat f2
+I bought two bananas and 3 mangoes
+
+$ # -i can be used with or without backup
+$ perl -i -pe 's/3/three/' f1 f2
+$ cat f1
+I ate three apples
+$ cat f2
+I bought two bananas and three mangoes
+```
+
+<br>
+
+## <a name="line-filtering"></a>Line filtering
+
+<br>
+
+#### <a name="regular-expressions-based-filtering"></a>Regular expressions based filtering
+
+* syntax is `variable =~ m/REGEXP/FLAGS` to check for a match
+    * `variable !~ m/REGEXP/FLAGS` for negated match
+    * by default acts on `$_` if variable is not specified
+* as we need to print only selective lines, use `-n` option
+    * by default, contents of `$_` will be printed if no argument is passed to `print`
+
+```bash
+$ cat poem.txt
+Roses are red,
+Violets are blue,
+Sugar is sweet,
+And so are you.
+
+$ # same as: grep '^[RS]' or sed -n '/^[RS]/p' or awk '/^[RS]/'
+$ # /^[RS]/ is shortcut for $_ =~ m/^[RS]/
+$ perl -ne 'print if /^[RS]/' poem.txt
+Roses are red,
+Sugar is sweet,
+
+$ # same as: grep -i 'and' poem.txt
+$ perl -ne 'print if /and/i' poem.txt
+And so are you.
+
+$ # same as: grep -v 'are' poem.txt
+$ # !/are/ is shortcut for $_ !~ m/are/
+$ perl -ne 'print if !/are/' poem.txt
+Sugar is sweet,
+
+$ # same as: awk '/are/ && !/so/' poem.txt
+$ perl -ne 'print if /are/ && !/so/' poem.txt
+Roses are red,
+Violets are blue,
+```
+
+* using different delimiter
+* quoting from [perldoc - Regexp Quote-Like Operators](https://perldoc.perl.org/perlop.html#Regexp-Quote-Like-Operators)
+
+> With the m you can use any pair of non-alphanumeric, non-whitespace characters as delimiters
+
+```bash
+$ cat paths.txt
+/foo/a/report.log
+/foo/y/power.log
+/foo/abc/errors.log
+
+$ perl -ne 'print if /\/foo\/a\//' paths.txt
+/foo/a/report.log
+
+$ perl -ne 'print if m#/foo/a/#' paths.txt
+/foo/a/report.log
+
+$ perl -ne 'print if !m#/foo/a/#' paths.txt
+/foo/y/power.log
+/foo/abc/errors.log
+```
+
+<br>
+
+#### <a name="fixed-string-matching"></a>Fixed string matching
+
+* similar to `grep -F` and `awk index`
+* See also
+    * [perldoc - index function](https://perldoc.perl.org/functions/index.html)
+    * [perldoc - Quote and Quote-like Operators](https://perldoc.perl.org/5.8.8/perlop.html#Quote-and-Quote-like-Operators)
+
+```bash
+$ # same as: grep -F 'a[5]' or awk 'index($0, "a[5]")'
+$ # index returns matching position(starts at 0) and -1 if not found
+$ echo 'int a[5]' | perl -ne 'print if index($_, "a[5]") != -1'
+int a[5]
+
+$ # however, string within double quotes gets interpolated, for ex
+$ a='123'; echo "$a"
+123
+$ perl -e '$a=123; print "$a\n"'
+123
+
+$ # so, for commandline usage, better to pass string as environment variable
+$ # they are accessible via the %ENV hash variable
+$ perl -le 'print $ENV{PWD}'
+/home/learnbyexample
+$ perl -le 'print $ENV{SHELL}'
+/bin/bash
+
+$ echo 'a#$%d' | perl -ne 'print if index($_, "#$%") != -1'
+$ echo 'a#$%d' | s='#$%' perl -ne 'print if index($_, $ENV{s}) != -1'
+a#$%d
+```
+
+* return value is useful to match at specific position
+* for ex: at start/end of line
+
+```bash
+$ cat eqns.txt
+a=b,a-b=c,c*d
+a+b,pi=3.14,5e12
+i*(t+9-g)/8,4-a+b
+
+$ # start of line
+$ # same as: s='a+b' awk 'index($0, ENVIRON["s"])==1' eqns.txt
+$ s='a+b' perl -ne 'print if index($_, $ENV{s})==0' eqns.txt
+a+b,pi=3.14,5e12
+
+$ # end of line
+$ # length function returns number of characters, by default acts on $_
+$ s='a+b' perl -ne '$pos = length() - length($ENV{s}) - 1;
+                    print if index($_, $ENV{s}) == $pos' eqns.txt
+i*(t+9-g)/8,4-a+b
+```
+
+<br>
+
+#### <a name="line-number-based-filtering"></a>Line number based filtering
+
+* special variable `$.` contains total records read so far, similar to `NR` in `awk`
+    * But no equivalent of awk's `FNR`, [see this stackoverflow Q&A for workaround](https://stackoverflow.com/questions/12384692/line-number-of-a-file-in-perl)
+* See also [perldoc - eof](https://perldoc.perl.org/perlfunc.html#eof)
+
+```bash
+$ # same as: head -n2 poem.txt | tail -n1
+$ # or sed -n '2p' or awk 'NR==2'
+$ perl -ne 'print if $.==2' poem.txt
+Violets are blue,
+
+$ # print 2nd and 4th line
+$ # same as: sed -n '2p; 4p' or awk 'NR==2 || NR==4'
+$ perl -ne 'print if $.==2 || $.==4' poem.txt
+Violets are blue,
+And so are you.
+
+$ # same as: tail -n1 poem.txt
+$ # or sed -n '$p' or awk 'END{print}'
+$ perl -ne 'print if eof' poem.txt
+And so are you.
+```
+
+* for large input, use `exit` to avoid unnecessary record processing
+
+```bash
+$ seq 14323 14563435 | perl -ne 'if($.==234){print; exit}'
+14556
+
+$ # sample time comparison
+$ time seq 14323 14563435 | perl -ne 'if($.==234){print; exit}' > /dev/null
+real    0m0.005s
+$ time seq 14323 14563435 | perl -ne 'print if $.==234' > /dev/null
+real    0m2.439s
+
+$ # mimicking head command, same as: head -n3 or sed '3q'
+$ seq 14 25 | perl -pe 'exit if $.>3'
+14
+15
+16
+
+$ # same as: sed '3Q'
+$ seq 14 25 | perl -pe 'exit if $.==3'
+14
+15
+```
+
+* selecting range of lines
+* `..` is [perldoc - range operator](https://perldoc.perl.org/perlop.html#Range-Operators)
+
+```bash
+$ # same as: sed -n '3,5p' or awk 'NR>=3 && NR<=5'
+$ # in this context, the range is compared against $.
+$ seq 14 25 | perl -ne 'print if 3..5'
+16
+17
+18
+
+$ # selecting from particular line number to end of input
+$ # same as: sed -n '10,$p' or awk 'NR>=10'
+$ seq 14 25 | perl -ne 'print if $.>=10'
+23
+24
+25
+```
+
+<br>
+
+## <a name="field-processing"></a>Field processing
+
+* `-a` option will auto-split each input record based on one or more continuous white-space, similar to default behavior in `awk`
+* Special variable array `@F` will contain all the elements, index starting from `0`
+* See also [perldoc - split function](https://perldoc.perl.org/functions/split.html)
+
+```bash
+$ cat fruits.txt
+fruit   qty
+apple   42
+banana  31
+fig     90
+guava   6
+
+$ # print only first field, index starting from 0
+$ # same as: awk '{print $1}' fruits.txt 
+$ perl -lane 'print $F[0]' fruits.txt
+fruit
+apple
+banana
+fig
+guava
+
+$ # print only second field
+$ # same as: awk '{print $2}' fruits.txt 
+$ perl -lane 'print $F[1]' fruits.txt
+qty
+42
+31
+90
+6
+```
+
+* by default, leading and trailing whitespaces won't be considered when splitting the input record
+    * mimicking `awk`'s default behavior
+
+```bash
+$ printf ' a    ate b\tc   \n'
+ a    ate b	c   
+$ printf ' a    ate b\tc   \n' | perl -lane 'print $F[0]'
+a
+$ printf ' a    ate b\tc   \n' | perl -lane 'print $F[-1]'
+c
+
+$ # number of fields
+$ echo '1 a 7' | perl -lane 'print $#F+1'
+3
+$ printf ' a    ate b\tc   \n' | perl -lane 'print $#F+1'
+4
+```
+
+<br>
+
+#### <a name="specifying-different-input-field-separator"></a>Specifying different input field separator
+
+* by using `-F` command line option
+
+```bash
+$ # second field where input field separator is :
+$ # same as: awk -F: '{print $2}'
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print $F[1]'
+123
+
+$ # last field, same as: awk -F: '{print $NF}'
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print $F[-1]'
+789
+$ # second last field, same as: awk -F: '{print $(NF-1)}'
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print $F[-2]'
+bar
+
+$ # second and last field
+$ # other ways to print more than 1 element will be covered later
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print "$F[1] $F[-1]"'
+123 789
+
+$ # use quotes to avoid clashes with shell special characters
+$ echo 'one;two;three;four' | perl -F';' -lane 'print $F[2]'
+three
+```
+
+* Regular expressions based input field separator
+
+```bash
+$ # same as: awk -F'[0-9]+' '{print $2}'
+$ echo 'Sample123string54with908numbers' | perl -F'\d+' -lane 'print $F[1]'
+string
+
+$ # first field will be empty as there is nothing before '{'
+$ # same as: awk -F'[{}= ]+' '{print $1}'
+$ # \x20 is space character, can't use literal space within [] when using -F
+$ echo '{foo}   bar=baz' | perl -F'[{}=\x20]+' -lane 'print $F[0]'
+
+$ echo '{foo}   bar=baz' | perl -F'[{}=\x20]+' -lane 'print $F[1]'
+foo
+$ echo '{foo}   bar=baz' | perl -F'[{}=\x20]+' -lane 'print $F[2]'
+bar
+```
+
+* empty argument to `-F` will split the input record character wise
+
+```bash
+$ # same as: gawk -v FS= '{print $1}'
+$ echo 'apple' | perl -F -lane 'print $F[0]'
+a
+$ echo 'apple' | perl -F -lane 'print $F[1]'
+p
+$ echo 'apple' | perl -F -lane 'print $F[-1]'
+e
+
+$ # use -C option when dealing with unicode characters
+$ # S will turn on UTF-8 for stdin/stdout/stderr streams
+$ printf 'hi👍 how are you?' | perl -CS -F -lane 'print $F[2]'
+👍
+```
+
+<br>
+
+#### <a name="specifying-different-output-field-separator"></a>Specifying different output field separator
+
+* Method 1: use `$,` to change separator between `print` arguments
+    * could be remembered easily by noting that `,` is used to separate `print` arguments
+
+```bash
+$ # by default, the various arguments are concatenated
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print $F[1], $F[-1]'
+123789
+
+$ # change $, if different separator is needed
+$ echo 'foo:123:bar:789' | perl -F: -lane '$,=" "; print $F[1], $F[-1]'
+123 789
+$ echo 'foo:123:bar:789' | perl -F: -lane '$,="-"; print $F[1], $F[-1]'
+123-789
+
+$ # argument can be array too
+$ echo 'foo:123:bar:789' | perl -F: -lane '$,="-"; print @F[1,-1]'
+123-789
+$ echo 'foo:123:bar:789' | perl -F: -lane '$,=" - "; print @F'
+foo - 123 - bar - 789
+```
+
+* Method 2: use `join`
+
+```bash
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print join "-", $F[1], $F[-1]'
+123-789
+
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print join "-", @F[1,-1]'
+123-789
+
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print join " - ", @F'
+foo - 123 - bar - 789
+```
+
+* Method 3: use `$"` to change separator when array is interpolated, default is space character
+    * could be remembered easily by noting that interpolation happens within double quotes
+
+```bash
+$ # default is space
+$ echo 'foo:123:bar:789' | perl -F: -lane 'print "@F[1,-1]"'
+123 789
+
+$ echo 'foo:123:bar:789' | perl -F: -lane '$"="-"; print "@F[1,-1]"'
+123-789
+
+$ echo 'foo:123:bar:789' | perl -F: -lane '$"=","; print "@F"'
+foo,123,bar,789
+```
+
+* use `BEGIN` if same separator is to used for all lines
+    * statements inside `BEGIN` are executed before processing any input text
+
+```bash
+$ # can also use: perl -lane 'BEGIN{$"=","} print "@F"' fruits.txt
+$ perl -lane 'BEGIN{$,=","} print @F' fruits.txt
+fruit,qty
+apple,42
+banana,31
+fig,90
+guava,6
+```
+
+
+<br>
+
+<br>
+
+<br>
+
+*More to follow*
